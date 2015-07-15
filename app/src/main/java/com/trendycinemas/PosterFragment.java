@@ -1,6 +1,9 @@
 package com.trendycinemas;
 
+import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.preference.PreferenceManager;
@@ -13,6 +16,8 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.GridView;
 
 import org.json.JSONException;
 
@@ -22,12 +27,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 
 
 /**
  * A placeholder fragment containing a simple view.
  */
 public class PosterFragment extends Fragment {
+
+    ArrayAdapter<String> mPosterAdapter;
 
     public PosterFragment() {
     }
@@ -59,7 +67,19 @@ public class PosterFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_main, container, false);
+        View rootView =  inflater.inflate(R.layout.fragment_main, container, false);
+
+        mPosterAdapter =
+                new ArrayAdapter<String>(
+                        getActivity(),
+                        R.layout.grid_item_poster,
+                        R.id.grid_item_poster_imageview,
+                        new ArrayList<String>()
+                );
+        GridView gridView = (GridView) rootView.findViewById(R.id.gridview_poster);
+        gridView.setAdapter(mPosterAdapter);
+
+        return rootView;
     }
 
     @Override
@@ -91,23 +111,36 @@ public class PosterFragment extends Fragment {
             // Will contain the raw JSON response as a string.
             String posterJsonStr = null;
             String api_key="";
+            String sort_by = params[0]+".desc";
+            GetMetaData metaData = new GetMetaData();
+            try{
+                api_key = metaData.getMetaDataFromManifest(getActivity(), "theMovieDBAPI");
+            }catch(PackageManager.NameNotFoundException e){
+                Log.e(LOG_TAG, "Error ", e);
+                // If the code didn't successfully get the api key, there's no point in attempting
+                // to make the request.
+                return null;
+            }
+
             String[] weatherData;
 
             try {
-                // Construct the URL for the OpenWeatherMap query
-                // Possible parameters are avaiable at OWM's forecast API page, at
-                // http://openweathermap.org/API#forecast
+                // Construct the URL for the TheMovieDB query
+                // Possible parameters are available at TMDB's configuration API page, at
+                // https://www.themoviedb.org/documentation/api
 
                 final String POSTER_BASE_URL ="http://api.themoviedb.org/3/discover/movie?";
                 final String SORT_BY = "sort_by";
                 final String API_KEY = "api_key";
                 Uri builtUri = Uri.parse(POSTER_BASE_URL).buildUpon()
-                        .appendQueryParameter(SORT_BY, params[0])
+                        .appendQueryParameter(SORT_BY, sort_by)
                         .appendQueryParameter(API_KEY, api_key)
                         .build();
                 URL url = new URL(builtUri.toString());
 
-                // Create the request to OpenWeatherMap, and open the connection
+                Log.v(LOG_TAG, url.toString());
+
+                // Create the request to TheMovieDB, and open the connection
                 urlConnection = (HttpURLConnection) url.openConnection();
                 urlConnection.setRequestMethod("GET");
                 urlConnection.connect();
@@ -136,7 +169,7 @@ public class PosterFragment extends Fragment {
                 posterJsonStr = buffer.toString();
             } catch (IOException e) {
                 Log.e(LOG_TAG, "Error ", e);
-                // If the code didn't successfully get the weather data, there's no point in attemping
+                // If the code didn't successfully get the movie data, there's no point in attemping
                 // to parse it.
                 return null;
             } finally {
@@ -152,6 +185,7 @@ public class PosterFragment extends Fragment {
                 }
             }
 
+            Log.v(LOG_TAG, posterJsonStr);
             /*try {
                 return getWeatherDataFromJson(forecastJsonStr, numDays);
             } catch (JSONException e) {
@@ -163,4 +197,28 @@ public class PosterFragment extends Fragment {
             return null;
         }
     }
+
+    public final class GetMetaData {
+
+        private GetMetaData() {
+//            throw new AssertionError();
+        }
+
+        /**
+         * Returns the metadata value with the metadata name
+         *
+         * @param context
+         * @param metadataName
+         * @return value of the metadata
+         * @throws PackageManager.NameNotFoundException when the MetaData Name is not in the Manifest
+         */
+        protected String getMetaDataFromManifest(Context context, String metadataName) throws PackageManager.NameNotFoundException {
+            ApplicationInfo appInfo = context.getPackageManager().getApplicationInfo(
+                    context.getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
+
+            Bundle bundle = appInfo.metaData;
+            return bundle.getString(metadataName);
+        }
+    }
+
 }
