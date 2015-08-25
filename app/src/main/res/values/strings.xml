@@ -4,4 +4,7 @@
     <string name="action_settings">Settings</string>
     <string name="image_description">Movie Image</string>
     <string name="action_refresh" translatable="false">Refresh</string>
+    <string name="msg_loading" translatable="false">Loading</string>
+    <string name="theMovieDBAPI" translatable="false">d3aca0174d8e10ef8fd8ee32a07acb0c</string>
+    <string name="msg_server_error">Server error</string>
 </resources>

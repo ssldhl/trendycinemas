@@ -19,9 +19,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <meta-data
-            android:name="theMovieDBAPI"
-            android:value="d3aca0174d8e10ef8fd8ee32a07acb0c"/>
 
     </application>
 

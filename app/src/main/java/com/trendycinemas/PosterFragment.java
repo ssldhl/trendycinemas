@@ -1,12 +1,8 @@
 package com.trendycinemas;
 
-import android.content.Context;
-import android.content.SharedPreferences;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.util.Log;
@@ -16,10 +12,17 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
+import android.widget.AbsListView;
 import android.widget.GridView;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import com.trendycinemas.model.Movie;
+import com.trendycinemas.model.PosterParam;
+
+import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -35,7 +38,11 @@ import java.util.ArrayList;
  */
 public class PosterFragment extends Fragment {
 
-    ArrayAdapter<String> mPosterAdapter;
+    PosterAdapter<Movie> mPosterAdapter;
+    TextView mLoading;
+    boolean mIsLoading = false;
+    int mPagesLoaded = 1;
+    String mAPIKey;
 
     public PosterFragment() {
     }
@@ -57,6 +64,7 @@ public class PosterFragment extends Fragment {
         int id = item.getItemId();
 
         if (id == R.id.action_refresh) {
+            resetView();
             updatePoster();
             return true;
         }
@@ -70,14 +78,34 @@ public class PosterFragment extends Fragment {
         View rootView =  inflater.inflate(R.layout.fragment_main, container, false);
 
         mPosterAdapter =
-                new ArrayAdapter<String>(
+                new PosterAdapter<>(
                         getActivity(),
                         R.layout.grid_item_poster,
                         R.id.grid_item_poster_imageview,
-                        new ArrayList<String>()
+                        new ArrayList<Movie>()
                 );
+
+        mLoading = (TextView) rootView.findViewById(R.id.loading);
+
         GridView gridView = (GridView) rootView.findViewById(R.id.gridview_poster);
         gridView.setAdapter(mPosterAdapter);
+
+        gridView.setOnScrollListener(
+                new AbsListView.OnScrollListener() {
+                    @Override
+                    public void onScrollStateChanged(AbsListView view, int scrollState) {
+
+                    }
+
+                    @Override
+                    public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
+                        int lastInScreen = firstVisibleItem + visibleItemCount;
+                        if (lastInScreen == totalItemCount) {
+                            updatePoster();
+                        }
+                    }
+                }
+        );
 
         return rootView;
     }
@@ -85,19 +113,52 @@ public class PosterFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+
+        mAPIKey = getString(R.string.theMovieDBAPI);
+
         updatePoster();
     }
 
     public void updatePoster(){
+
+        if(mIsLoading){
+            return;
+        }
+
+        mIsLoading = true;
+
+        if (mLoading != null) {
+            mLoading.setVisibility(View.VISIBLE);
+        }
+
+        PosterParam posterParam = new PosterParam(mPagesLoaded, "popularity");
+
         FetchPosterTask posterTask = new FetchPosterTask();
-        posterTask.execute("popularity");
+        posterTask.execute(posterParam);
     }
 
-    public class FetchPosterTask extends AsyncTask<String, Void, String[]>{
+    public void stopLoading() {
+        if (!mIsLoading) {
+            return;
+        }
+
+        mIsLoading = false;
+
+        if (mLoading != null) {
+            mLoading.setVisibility(View.GONE);
+        }
+    }
+
+    public void resetView(){
+        mPosterAdapter.clear();
+        mPagesLoaded = 1;
+    }
+
+    public class FetchPosterTask extends AsyncTask<PosterParam, Void, ArrayList<Movie>>{
         private final String LOG_TAG = FetchPosterTask.class.getSimpleName();
 
         @Override
-        protected String[] doInBackground(String... params) {
+        protected ArrayList<Movie> doInBackground(PosterParam... params) {
             // If there's no zip code, there's nothing to look up.  Verify size of params.
             if (params.length == 0) {
                 return null;
@@ -110,35 +171,27 @@ public class PosterFragment extends Fragment {
 
             // Will contain the raw JSON response as a string.
             String posterJsonStr = null;
-            String api_key="";
-            String sort_by = params[0]+".desc";
-            GetMetaData metaData = new GetMetaData();
-            try{
-                api_key = metaData.getMetaDataFromManifest(getActivity(), "theMovieDBAPI");
-            }catch(PackageManager.NameNotFoundException e){
-                Log.e(LOG_TAG, "Error ", e);
-                // If the code didn't successfully get the api key, there's no point in attempting
-                // to make the request.
-                return null;
-            }
-
-            String[] weatherData;
+            String api_key = mAPIKey;
+            String sort_by = params[0].getSort()+".desc";
+            int page = params[0].getPage();
 
             try {
                 // Construct the URL for the TheMovieDB query
                 // Possible parameters are available at TMDB's configuration API page, at
                 // https://www.themoviedb.org/documentation/api
 
-                final String POSTER_BASE_URL ="http://api.themoviedb.org/3/discover/movie?";
+                final String API_BASE_URL ="http://api.themoviedb.org/3/discover/movie?";
                 final String SORT_BY = "sort_by";
                 final String API_KEY = "api_key";
-                Uri builtUri = Uri.parse(POSTER_BASE_URL).buildUpon()
+                final String PAGE_KEY = "page";
+                Uri builtUri = Uri.parse(API_BASE_URL).buildUpon()
                         .appendQueryParameter(SORT_BY, sort_by)
+                        .appendQueryParameter(PAGE_KEY, String.valueOf(page))
                         .appendQueryParameter(API_KEY, api_key)
                         .build();
                 URL url = new URL(builtUri.toString());
 
-                Log.v(LOG_TAG, url.toString());
+                Log.d(LOG_TAG, url.toString());
 
                 // Create the request to TheMovieDB, and open the connection
                 urlConnection = (HttpURLConnection) url.openConnection();
@@ -147,7 +200,7 @@ public class PosterFragment extends Fragment {
 
                 // Read the input stream into a String
                 InputStream inputStream = urlConnection.getInputStream();
-                StringBuffer buffer = new StringBuffer();
+                StringBuilder buffer = new StringBuilder();
                 if (inputStream == null) {
                     // Nothing to do.
                     return null;
@@ -159,7 +212,7 @@ public class PosterFragment extends Fragment {
                     // Since it's JSON, adding a newline isn't necessary (it won't affect parsing)
                     // But it does make debugging a *lot* easier if you print out the completed
                     // buffer for debugging.
-                    buffer.append(line +"\n");
+                    buffer.append(line).append("\n");
                 }
 
                 if (buffer.length() == 0) {
@@ -185,40 +238,49 @@ public class PosterFragment extends Fragment {
                 }
             }
 
-            Log.v(LOG_TAG, posterJsonStr);
-            /*try {
-                return getWeatherDataFromJson(forecastJsonStr, numDays);
+            try {
+                return getMovieDataFromJson(posterJsonStr);
             } catch (JSONException e) {
                 Log.e(LOG_TAG, e.getMessage(), e);
                 e.printStackTrace();
-            }*/
+            }
 
             // This will only happen if there was an error getting or parsing the forecast.
             return null;
         }
-    }
 
-    public final class GetMetaData {
+        private ArrayList<Movie> getMovieDataFromJson(String posterJsonStr) throws JSONException{
+            final String KEY_MOVIES = "results";
 
-        private GetMetaData() {
-//            throw new AssertionError();
+            JSONObject posterJson  = new JSONObject(posterJsonStr);
+            JSONArray movies = posterJson.getJSONArray(KEY_MOVIES);
+            ArrayList<Movie> result = new ArrayList<>();
+
+            for (int i = 0; i < movies.length(); i++) {
+                result.add(Movie.fromJson(movies.getJSONObject(i)));
+            }
+
+            return result;
         }
 
-        /**
-         * Returns the metadata value with the metadata name
-         *
-         * @param context
-         * @param metadataName
-         * @return value of the metadata
-         * @throws PackageManager.NameNotFoundException when the MetaData Name is not in the Manifest
-         */
-        protected String getMetaDataFromManifest(Context context, String metadataName) throws PackageManager.NameNotFoundException {
-            ApplicationInfo appInfo = context.getPackageManager().getApplicationInfo(
-                    context.getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
+        @Override
+        protected void onPostExecute(ArrayList<Movie> result) {
+            if(result != null){
+                mPagesLoaded++;
+                stopLoading();
+                for(Movie movie : result){
+                    mPosterAdapter.add(movie);
+                }
+                //new data is back from server. Hooray!
+            }else{
+                Toast.makeText(
+                        getActivity(),
+                        getString(R.string.msg_server_error),
+                        Toast.LENGTH_SHORT
+                ).show();
 
-            Bundle bundle = appInfo.metaData;
-            return bundle.getString(metadataName);
+                stopLoading();
+            }
         }
     }
-
 }
