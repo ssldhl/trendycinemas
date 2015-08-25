@@ -1,6 +1,5 @@
 package com.trendycinemas;
 
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v4.app.Fragment;
@@ -18,7 +17,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.trendycinemas.model.Movie;
-import com.trendycinemas.model.PosterParam;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -120,7 +118,6 @@ public class PosterFragment extends Fragment {
     }
 
     public void updatePoster(){
-
         if(mIsLoading){
             return;
         }
@@ -131,10 +128,8 @@ public class PosterFragment extends Fragment {
             mLoading.setVisibility(View.VISIBLE);
         }
 
-        PosterParam posterParam = new PosterParam(mPagesLoaded, "popularity");
-
         FetchPosterTask posterTask = new FetchPosterTask();
-        posterTask.execute(posterParam);
+        posterTask.execute("popularity");
     }
 
     public void stopLoading() {
@@ -154,11 +149,11 @@ public class PosterFragment extends Fragment {
         mPagesLoaded = 1;
     }
 
-    public class FetchPosterTask extends AsyncTask<PosterParam, Void, ArrayList<Movie>>{
+    public class FetchPosterTask extends AsyncTask<String, Void, ArrayList<Movie>>{
         private final String LOG_TAG = FetchPosterTask.class.getSimpleName();
 
         @Override
-        protected ArrayList<Movie> doInBackground(PosterParam... params) {
+        protected ArrayList<Movie> doInBackground(String... params) {
             // If there's no zip code, there's nothing to look up.  Verify size of params.
             if (params.length == 0) {
                 return null;
@@ -172,8 +167,8 @@ public class PosterFragment extends Fragment {
             // Will contain the raw JSON response as a string.
             String posterJsonStr = null;
             String api_key = mAPIKey;
-            String sort_by = params[0].getSort()+".desc";
-            int page = params[0].getPage();
+            String sort_by = params[0]+".desc";
+            int page = mPagesLoaded;
 
             try {
                 // Construct the URL for the TheMovieDB query
