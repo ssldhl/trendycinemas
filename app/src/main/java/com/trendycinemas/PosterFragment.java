@@ -40,7 +40,6 @@ public class PosterFragment extends Fragment {
     TextView mLoading;
     boolean mIsLoading = false;
     int mPagesLoaded = 1;
-    String mAPIKey;
 
     public PosterFragment() {
     }
@@ -111,9 +110,6 @@ public class PosterFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
-
-        mAPIKey = getString(R.string.theMovieDBAPI);
-
         updatePoster();
     }
 
@@ -166,7 +162,7 @@ public class PosterFragment extends Fragment {
 
             // Will contain the raw JSON response as a string.
             String posterJsonStr = null;
-            String api_key = mAPIKey;
+            String api_key = getString(R.string.theMovieDBAPI);
             String sort_by = params[0]+".desc";
             int page = mPagesLoaded;
 
