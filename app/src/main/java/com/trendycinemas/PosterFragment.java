@@ -1,7 +1,10 @@
 package com.trendycinemas;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.util.Log;
@@ -12,6 +15,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AbsListView;
+import android.widget.AdapterView;
 import android.widget.GridView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -87,6 +91,16 @@ public class PosterFragment extends Fragment {
         GridView gridView = (GridView) rootView.findViewById(R.id.gridview_poster);
         gridView.setAdapter(mPosterAdapter);
 
+        gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Movie movie = mPosterAdapter.getItem(position);
+                Intent intent = new Intent(getActivity(), DetailActivity.class).
+                        putExtra(Movie.EXTRA_TEXT, movie.toBundle());
+                startActivity(intent);
+            }
+        });
+
         gridView.setOnScrollListener(
                 new AbsListView.OnScrollListener() {
                     @Override
@@ -110,6 +124,7 @@ public class PosterFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+        resetView();
         updatePoster();
     }
 
@@ -125,7 +140,7 @@ public class PosterFragment extends Fragment {
         }
 
         FetchPosterTask posterTask = new FetchPosterTask();
-        posterTask.execute("popularity");
+        posterTask.execute();
     }
 
     public void stopLoading() {
@@ -150,11 +165,6 @@ public class PosterFragment extends Fragment {
 
         @Override
         protected ArrayList<Movie> doInBackground(String... params) {
-            // If there's no zip code, there's nothing to look up.  Verify size of params.
-            if (params.length == 0) {
-                return null;
-            }
-
             // These two need to be declared outside the try/catch
             // so that they can be closed in the finally block.
             HttpURLConnection urlConnection = null;
@@ -162,8 +172,12 @@ public class PosterFragment extends Fragment {
 
             // Will contain the raw JSON response as a string.
             String posterJsonStr = null;
+
             String api_key = getString(R.string.theMovieDBAPI);
-            String sort_by = params[0]+".desc";
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+            String sort_by = prefs.getString(getString(R.string.pref_sort_key),
+                    getString(R.string.pref_sort_popularity));
+            sort_by = sort_by+".desc";
             int page = mPagesLoaded;
 
             try {

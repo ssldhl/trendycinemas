@@ -1,13 +1,14 @@
 package com.trendycinemas.model;
 
 import android.net.Uri;
+import android.os.Bundle;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public class Movie {
 
-    public static final String EXTRA_MOVIE = "io.maritimus.sofaexpert.EXTRA_MOVIE";
+    public static final String EXTRA_TEXT = "icom.trendycinemas.EXTRA_MOVIE";
     public static final String KEY_ID = "id";
     public static final String KEY_TITLE = "title";
     public static final String KEY_OVERVIEW = "overview";
@@ -37,6 +38,18 @@ public class Movie {
         this.release_date = release_date;
     }
 
+    public Movie(Bundle bundle) {
+        this(
+                bundle.getLong(KEY_ID),
+                bundle.getString(KEY_TITLE),
+                bundle.getString(KEY_OVERVIEW),
+                bundle.getString(KEY_POSTER_PATH),
+                bundle.getDouble(KEY_VOTE_AVERAGE),
+                bundle.getLong(KEY_VOTE_COUNT),
+                bundle.getString(KEY_RELEASE_DATE)
+        );
+    }
+
     public static Movie fromJson(JSONObject jsonObject) throws JSONException {
         return new Movie(
                 jsonObject.getLong(KEY_ID),
@@ -56,5 +69,24 @@ public class Movie {
                 .appendPath(IMAGE_SIZE)
                 .appendEncodedPath(poster_path)
                 .build();
+    }
+
+    public Bundle toBundle(){
+        Bundle bundle = new Bundle();
+
+        bundle.putLong(KEY_ID, id);
+        bundle.putString(KEY_TITLE, title);
+        bundle.putString(KEY_OVERVIEW, overview);
+        bundle.putString(KEY_POSTER_PATH, poster_path);
+        bundle.putDouble(KEY_VOTE_AVERAGE, vote_average);
+        bundle.putLong(KEY_VOTE_COUNT, vote_count);
+        bundle.putString(KEY_RELEASE_DATE, release_date);
+
+
+        return bundle;
+    }
+
+    public String getRating(){
+        return String.valueOf(vote_average) + "/10.0";
     }
 }
