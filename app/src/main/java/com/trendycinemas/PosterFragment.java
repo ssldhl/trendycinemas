@@ -196,8 +196,6 @@ public class PosterFragment extends Fragment {
                         .build();
                 URL url = new URL(builtUri.toString());
 
-                Log.d(LOG_TAG, url.toString());
-
                 // Create the request to TheMovieDB, and open the connection
                 urlConnection = (HttpURLConnection) url.openConnection();
                 urlConnection.setRequestMethod("GET");
